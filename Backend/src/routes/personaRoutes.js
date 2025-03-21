@@ -1,37 +1,65 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const path = require("path");
 const { createPersona, getPersonasByType, toggleFavorite } = require("../models/persona");
 
-router.post("/personas", async (req, res) => {
+
+// ✅ Configure multer for profile photo uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "../uploads/"));
+  },
+  filename: (req, file, cb) => {
+    const safeFilename = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_"); // ✅ Remove special characters
+    cb(null, `${Date.now()}-${safeFilename}`);
+  },
+});
+
+const upload = multer({ storage });
+
+// ✅ Create a new persona (with optional profile photo)
+router.post("/personas", upload.single("profilePhoto"), async (req, res) => {
   try {
-    const personaData = req.body;
-    const result = await createPersona(personaData);
+    console.log("📥 Received form data:", req.body);
+    console.log("📸 Uploaded file:", req.file);
 
-    if (!result) {
-      return res.status(500).json({ message: "Failed to create persona." });
-    }
+    const { name, email, phone, state, pinCode, message, type, isFavorite, ...additionalDetails } = req.body;
+const profilePhoto = req.file ? req.file.filename : "";
 
-    console.log("✅ Persona successfully created:", result);
+const newPersona = await createPersona({
+  name,
+  email,
+  phone,
+  state,
+  pinCode,
+  message,
+  type,
+  isFavorite: isFavorite === "true",
+  profile_photo: profilePhoto, 
+  ...additionalDetails, // ✅ Pass additional fields for Employees, Vendors, and Customers
+});
 
-    res.status(201).json({ message: "Persona added successfully", data: result });
+    res.status(201).json({ message: "Persona added successfully", data: newPersona });
   } catch (error) {
-    console.error("❌ Error adding persona:", error);
-    res.status(500).json({ message: "Error adding persona", error: error.message });
+    console.error("❌ Error creating persona:", error);
+    res.status(500).json({ error: "Failed to create persona", details: error.message });
   }
 });
 
-// Get personas (filtered by type if provided)
+// ✅ Get personas (filtered by type if provided)
 router.get("/personas", async (req, res) => {
   try {
-    const type = req.query.type || null; // Optional type filter
+    const type = req.query.type || null;
     const personas = await getPersonasByType(type);
     res.status(200).json(personas);
   } catch (error) {
-    console.error("Error fetching personas:", error);
+    console.error("❌ Error fetching personas:", error);
     res.status(500).json({ message: "Error fetching personas", error: error.message });
   }
 });
 
+// ✅ Toggle favorite status
 router.patch("/personas/:id/favorite", async (req, res) => {
   try {
     const { id } = req.params;
@@ -57,6 +85,5 @@ router.patch("/personas/:id/favorite", async (req, res) => {
     res.status(500).json({ message: "Internal server error", error: error.message });
   }
 });
-
 
 module.exports = router;

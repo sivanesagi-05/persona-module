@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
@@ -33,6 +33,7 @@ const formSchema = z.object({
   type: z.enum(["Vendors", "Employees", "Customers", "Others"], {
     required_error: "Please select a persona type.",
   }),
+  profilePhoto: z.any().optional(),
   // Vendor specific fields
   address: z.string().optional().or(z.literal("")),
   panNumber: z.string().optional().or(z.literal("")),
@@ -91,6 +92,7 @@ const AddPersonaModal = ({ isOpen, onClose, onAdd }: AddPersonaModalProps) => {
       pinCode: "",
       message: "",
       type: "Employees",
+      profilePhoto: null,
       // Vendor specific
       address: "",
       panNumber: "",
@@ -129,19 +131,80 @@ const AddPersonaModal = ({ isOpen, onClose, onAdd }: AddPersonaModalProps) => {
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/personas', data);
-      console.log('Persona added successfully:', response.data);
-      // Optionally, you can close the modal here
+      const formData = new FormData();
+
+      // ✅ Append Basic Info
+      formData.append("name", data.name);
+      formData.append("email", data.email);
+      formData.append("phone", data.phone);
+      formData.append("state", data.state || "");
+      formData.append("pinCode", data.pinCode || "");
+      formData.append("message", data.message || "");
+      formData.append("type", data.type);
+      formData.append("isFavorite", data.isFavorite.toString());
+
+      // ✅ Append Profile Photo (Only If Selected)
+      if (data.profilePhoto instanceof File) {
+        formData.append("profilePhoto", data.profilePhoto);
+      }
+
+      // ✅ Append Additional Fields Based on Selected Type
+      if (data.type === "Vendors") {
+        formData.append("address", data.address || "");
+        formData.append("panNumber", data.panNumber || "");
+        formData.append("gstNumber", data.gstNumber || "");
+        formData.append("bankName", data.bankName || "");
+        formData.append("accountNumber", data.accountNumber || "");
+        formData.append("ifscCode", data.ifscCode || "");
+      } else if (data.type === "Employees") {
+        formData.append("dateOfBirth", data.dateOfBirth || "");
+        formData.append("fatherName", data.fatherName || "");
+        formData.append("bloodGroup", data.bloodGroup || "");
+        formData.append("emergencyContact", data.emergencyContact || "");
+        formData.append("aadharNumber", data.aadharNumber || "");
+        formData.append("joiningDate", data.joiningDate || "");
+        formData.append("probationEndDate", data.probationEndDate || "");
+        formData.append("previousEmployer", data.previousEmployer || "");
+      } else if (data.type === "Customers") {
+        // formData.append("age", data.age || "");
+        formData.append("location", data.location || "");
+        formData.append("job", data.job || "");
+        formData.append("income", data.income || "");
+        formData.append("age", data.age ? parseInt(data.age, 10).toString() : "null");
+        formData.append("familyMembers", data.familyMembers ? String(data.familyMembers) : "null");
+        formData.append("weight", data.weight ? parseInt(data.weight, 10).toString() : "null");
+        formData.append("userType", data.userType || "");
+        formData.append("wheelchairType", data.wheelchairType || "");
+        formData.append("commuteRange", data.commuteRange || "");
+        formData.append("commuteMode", data.commuteMode || "");
+        formData.append("painsDaily", data.painsDaily || "");
+        formData.append("painsCommute", data.painsCommute || "");
+        formData.append("solutionsNeeded", data.solutionsNeeded || "");
+        formData.append("customerSegment", data.customerSegment || "");
+        formData.append("expectedGain", data.expectedGain || "");
+      }
+
+      // ✅ Debugging - Log FormData
+      console.log("🚀 FormData being sent:", [...formData.entries()]);
+
+      // ✅ Make API Call
+      const response = await axios.post("http://localhost:5000/api/personas", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      console.log("✅ Persona added successfully:", response.data);
+
+      // ✅ Call onAdd to update UI instantly
+      onAdd(response.data.data);
+
+      // ✅ Close Modal After Submission
       onClose();
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('Error adding persona:', error.message);
-        // You can also display a user-friendly error message here
-      } else {
-        console.error('Unexpected error:', error);
-      }
+      console.error("❌ Error adding persona:", error);
     }
   };
+
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -254,6 +317,53 @@ const AddPersonaModal = ({ isOpen, onClose, onAdd }: AddPersonaModalProps) => {
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="profilePhoto"
+                  render={({ field }) => {
+                    const [preview, setPreview] = useState(null);
+
+                    useEffect(() => {
+                      if (field.value instanceof File) {
+                        const objectUrl = URL.createObjectURL(field.value);
+                        setPreview(objectUrl);
+
+                        return () => URL.revokeObjectURL(objectUrl); // Cleanup
+                      }
+                    }, [field.value]);
+
+                    return (
+                      <FormItem>
+                        <FormLabel>Profile Photo</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center space-x-4">
+                            {/* Show Image Preview */}
+                            {preview && (
+                              <img
+                                src={preview}
+                                alt="Profile Preview"
+                                className="w-16 h-16 rounded-full object-cover border"
+                              />
+                            )}
+                            <div>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  if (e.target.files?.[0]) {
+                                    field.onChange(e.target.files[0]); // Update form value
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+                
                 <FormField
                   control={form.control}
                   name="message"

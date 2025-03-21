@@ -10,7 +10,7 @@ CREATE TABLE personas (
     state VARCHAR(100),
     pin_code VARCHAR(10),
     message TEXT,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('Employees', 'Vendors', 'Customers')),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('Employees', 'Vendors', 'Customers', 'Others')),
     is_favorite BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

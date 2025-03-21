@@ -10,8 +10,12 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
 };
 const db = pgp(dbConfig);
+
 // ✅ Helper function to handle empty values
-const cleanValue = (value) => (value !== undefined && value !== "" ? value : null);
+const cleanValue = (value) => {
+  if (value === undefined || value === "" || value === "null" || value === "undefined") return null;
+  return value;
+};
 
 const createPersona = async (persona) => {
   try {
@@ -19,16 +23,18 @@ const createPersona = async (persona) => {
 
     // ✅ Check if email already exists
     const existingPersona = await db.oneOrNone("SELECT * FROM personas WHERE email = $1", [persona.email]);
+
     if (existingPersona) {
+      console.log("❌ Persona already exists:", existingPersona);
       throw new Error(`Persona with email ${persona.email} already exists.`);
     }
 
-    console.log("✅ Email is unique, proceeding with insertion.");
+    console.log("✅ No existing persona found. Proceeding with insertion.");
 
-    // ✅ Insert into the `personas` table (only basic details)
+    // ✅ Insert into `personas` table
     const personaResult = await db.one(
-      `INSERT INTO personas (name, email, phone, state, pin_code, message, type, is_favorite, created_at, updated_at) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) RETURNING *`,
+      `INSERT INTO personas (name, email, phone, state, pin_code, message, type, is_favorite, profile_photo, created_at, updated_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) RETURNING *`,
       [
         persona.name,
         persona.email,
@@ -38,95 +44,72 @@ const createPersona = async (persona) => {
         cleanValue(persona.message),
         persona.type,
         Boolean(persona.isFavorite),
+        persona.profile_photo || "", // Store only the filename
       ]
     );
 
     console.log(`✅ Persona inserted with ID: ${personaResult.id}`);
 
-    // ✅ Insert into the corresponding table **only if additional details exist**
-    switch (persona.type) {
-      case "Employees": {
-        if (persona.dateOfBirth || persona.fatherName || persona.bloodGroup) {
-          const employeeQuery = `
-            INSERT INTO employees (persona_id, date_of_birth, father_name, blood_group, emergency_contact, aadhar_number, 
-              joining_date, probation_end_date, previous_employer) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
+    // ✅ Insert into Respective Table Based on Type
+    if (persona.type === "Employees") {
+      const employeeQuery = `
+        INSERT INTO employees (persona_id, date_of_birth, father_name, blood_group, emergency_contact, aadhar_number, 
+          joining_date, probation_end_date, previous_employer) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
 
-          const employeeValues = [
-            personaResult.id,
-            cleanValue(persona.dateOfBirth),
-            cleanValue(persona.fatherName),
-            cleanValue(persona.bloodGroup),
-            cleanValue(persona.emergencyContact),
-            cleanValue(persona.aadharNumber),
-            cleanValue(persona.joiningDate),
-            cleanValue(persona.probationEndDate),
-            cleanValue(persona.previousEmployer),
-          ];
+      await db.one(employeeQuery, [
+        personaResult.id,
+        cleanValue(persona.dateOfBirth),
+        cleanValue(persona.fatherName),
+        cleanValue(persona.bloodGroup),
+        cleanValue(persona.emergencyContact),
+        cleanValue(persona.aadharNumber),
+        cleanValue(persona.joiningDate),
+        cleanValue(persona.probationEndDate),
+        cleanValue(persona.previousEmployer),
+      ]);
+      console.log("✅ Employee details inserted.");
+    } else if (persona.type === "Vendors") {
+      const vendorQuery = `
+        INSERT INTO vendors (persona_id, address, pan_number, gst_number, bank_name, account_number, ifsc_code) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
 
-          console.log("🔄 Executing employee query:", employeeQuery, "with values:", employeeValues);
-          await db.one(employeeQuery, employeeValues);
-          console.log("✅ Employee inserted.");
-        }
-        break;
-      }
+      await db.one(vendorQuery, [
+        personaResult.id,
+        cleanValue(persona.address),
+        cleanValue(persona.panNumber),
+        cleanValue(persona.gstNumber),
+        cleanValue(persona.bankName),
+        cleanValue(persona.accountNumber),
+        cleanValue(persona.ifscCode),
+      ]);
+      console.log("✅ Vendor details inserted.");
+    } else if (persona.type === "Customers") {
+      const customerQuery = `
+        INSERT INTO customers (persona_id, age, location, job, income_range, family_members, weight, user_type, 
+          wheelchair_type, commute_range, commute_mode, pains_daily, pains_commute, solutions_needed, 
+          customer_segment, expected_gain) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`;
 
-      case "Vendors": {
-        if (persona.address || persona.panNumber || persona.gstNumber) {
-          const vendorQuery = `
-            INSERT INTO vendors (persona_id, address, pan_number, gst_number, bank_name, account_number, ifsc_code) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
-
-          const vendorValues = [
-            personaResult.id,
-            cleanValue(persona.address),
-            cleanValue(persona.panNumber),
-            cleanValue(persona.gstNumber),
-            cleanValue(persona.bankName),
-            cleanValue(persona.accountNumber),
-            cleanValue(persona.ifscCode),
-          ];
-
-          console.log("🔄 Executing vendor query:", vendorQuery, "with values:", vendorValues);
-          await db.one(vendorQuery, vendorValues);
-          console.log("✅ Vendor inserted.");
-        }
-        break;
-      }
-
-      case "Customers": {
-        if (persona.age || persona.location || persona.commuteMode) {
-          const customerQuery = `
-            INSERT INTO customers (persona_id, age, location, job, income_range, family_members, weight, user_type, 
-              wheelchair_type, commute_range, commute_mode, pains_daily, pains_commute, solutions_needed, 
-              customer_segment, expected_gain) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`;
-
-          const customerValues = [
-            personaResult.id,
-            cleanValue(persona.age),
-            cleanValue(persona.location),
-            cleanValue(persona.job),
-            cleanValue(persona.income),
-            cleanValue(persona.familyMembers),
-            cleanValue(persona.weight),
-            cleanValue(persona.userType),
-            cleanValue(persona.wheelchairType),
-            cleanValue(persona.commuteRange),
-            cleanValue(persona.commuteMode), // ✅ NULL if empty
-            cleanValue(persona.painsDaily),
-            cleanValue(persona.painsCommute),
-            cleanValue(persona.solutionsNeeded),
-            cleanValue(persona.customerSegment),
-            cleanValue(persona.expectedGain),
-          ];
-
-          console.log("🔄 Executing customer query:", customerQuery, "with values:", customerValues);
-          await db.one(customerQuery, customerValues);
-          console.log("✅ Customer inserted.");
-        }
-        break;
-      }
+      await db.one(customerQuery, [
+        personaResult.id,
+        cleanValue(persona.age),
+        cleanValue(persona.location),
+        cleanValue(persona.job),
+        cleanValue(persona.income),
+        cleanValue(persona.familyMembers),
+        cleanValue(persona.weight),
+        cleanValue(persona.userType),
+        cleanValue(persona.wheelchairType),
+        cleanValue(persona.commuteRange),
+        cleanValue(persona.commuteMode),
+        cleanValue(persona.painsDaily),
+        cleanValue(persona.painsCommute),
+        cleanValue(persona.solutionsNeeded),
+        cleanValue(persona.customerSegment),
+        cleanValue(persona.expectedGain),
+      ]);
+      console.log("✅ Customer details inserted.");
     }
 
     return personaResult;
@@ -136,29 +119,29 @@ const createPersona = async (persona) => {
   }
 };
 
-
-
-
-
 // ✅ Get Personas by Type
 const getPersonasByType = async (type) => {
   try {
     console.log(`🔍 Fetching personas of type: ${type || "All"}`);
 
-    if (type) {
-      return await db.any("SELECT * FROM personas WHERE type = $1", [type]);
-    }
-    return await db.any("SELECT * FROM personas");
+    const personas = type
+      ? await db.any("SELECT * FROM personas WHERE type = $1", [type])
+      : await db.any("SELECT * FROM personas");
+
+    // ✅ Format response to return full image URL
+    const formattedPersonas = personas.map((persona) => ({
+      ...persona,
+      profile_photo: persona.profile_photo
+        ? `${process.env.BACKEND_URL || "http://localhost:5000"}/uploads/${persona.profile_photo}`
+        : null,
+    }));
+
+    return formattedPersonas;
   } catch (error) {
     console.error("❌ Database error fetching personas:", error);
     throw error;
   }
 };
-
-
-
-
-
 
 // ✅ Toggle Favorite Status
 const toggleFavorite = async (id, isFavorite) => {

@@ -121,33 +121,38 @@ export default function PersonaDashboard() {
     const fetchPersonas = async () => {
       try {
         const response = await axios.get(`${API_BASE_URL}/personas`);
+        if (!response || !response.data) {
+          throw new Error("Invalid response from server");
+        }
+
         const formattedData = response.data.map((persona) => ({
           ...persona,
           persona_id: persona.persona_id || persona.id,
           isFavorite: persona.is_favorite ?? false,
+          profilePhoto: persona.profile_photo
+            ? persona.profile_photo.startsWith("http")
+              ? persona.profile_photo  // Already a full URL, use as is
+              : `${API_BASE_URL}/uploads/${persona.profile_photo.replace(/^\/?uploads\//, '')}` // Ensure correct URL format
+            : null, // Handle missing images gracefully
         }));
 
-        // 🔥 Ensure newly added personas are not overwritten
-        setPersonas((prev) => {
-          const personaIds = new Set(prev.map((p) => p.persona_id));
-          const newPersonas = formattedData.filter((p) => !personaIds.has(p.persona_id));
-          return [...prev, ...newPersonas];
-        });
-
-        setFavorites((prevFavorites) => {
-          const favoriteIds = new Set(prevFavorites.map((p) => p.persona_id));
-          const newFavorites = formattedData.filter((p) => p.isFavorite && !favoriteIds.has(p.persona_id));
-          return [...prevFavorites, ...newFavorites];
-        });
+        setPersonas(formattedData);
+        setFavorites(formattedData.filter((p) => p.isFavorite));
 
       } catch (error) {
-        console.error("❌ Failed to fetch personas:", error);
-        setError("Failed to fetch personas. Please try again.");
+        console.error("❌ API Error:", error?.response?.data || error.message);
+        setError(error?.response?.data?.message || "Failed to fetch personas. Please try again.");
       }
     };
 
     fetchPersonas();
-  }, []); // ✅ Run only on mount, not after every update
+
+    // ✅ Polling every 5 seconds to auto-update (Optional)
+    const interval = setInterval(fetchPersonas, 5000);
+
+    return () => clearInterval(interval);
+  }, []); // ❌ Removed `personas` from dependency array to prevent infinite re-renders.
+ // ✅ Re-run when personas update // ✅ Run only on mount, not after every update
 
 
   const toggleFavorite = async (id: string, e: React.MouseEvent) => {
@@ -181,7 +186,18 @@ export default function PersonaDashboard() {
 
   const handleAddPersona = async (newPersona) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/personas`, newPersona);
+      const formData = new FormData();
+      Object.keys(newPersona).forEach((key) => {
+        formData.append(key, newPersona[key]);
+      });
+
+      if (newPersona.profilePhoto instanceof File) {
+        formData.append("profilePhoto", newPersona.profilePhoto);
+      }
+
+      const response = await axios.post(`${API_BASE_URL}/personas`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       if (!response.data || !response.data.data) {
         console.error("❌ Unexpected API response:", response);
@@ -191,16 +207,13 @@ export default function PersonaDashboard() {
 
       const savedPersona = {
         ...response.data.data,
-        persona_id: response.data.data.persona_id || response.data.data.id, // Ensure ID consistency
+        persona_id: response.data.data.persona_id || response.data.data.id,
         isFavorite: response.data.data.is_favorite ?? false,
       };
 
       console.log("✅ Persona added successfully:", savedPersona);
 
-      // ✅ Update UI instantly (without refreshing)
       setPersonas((prev) => [savedPersona, ...prev]);
-
-      // ✅ Update favorites if necessary
       if (savedPersona.isFavorite) {
         setFavorites((prev) => [...prev, savedPersona]);
       }
@@ -211,7 +224,6 @@ export default function PersonaDashboard() {
       setError("Error adding persona. Please check your inputs and try again.");
     }
   };
-
 
 
 
@@ -695,23 +707,43 @@ export default function PersonaDashboard() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {favorites.map((persona) => (
                       <div
-                        key={persona.persona_id || persona.id} // ✅ Ensure key uses the correct ID
-                        className="flex flex-col items-center text-center p-2 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => navigateToProfile(persona.persona_id || persona.id)} // ✅ Always pass the correct ID dynamically
+                        key={persona.persona_id || persona.id}
+                        className="relative flex flex-col items-center text-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        onClick={() => navigateToProfile(persona.persona_id || persona.id)}
                       >
+                        {/* ✅ Profile Image with Border & Shadow */}
+                        <div className="w-16 h-16 bg-gray-200 rounded-full overflow-hidden shadow-sm border">
+                          {persona.profilePhoto ? (
+                            <img
+                              src={persona.profilePhoto.startsWith("http") ? persona.profilePhoto : `http://localhost:5000/${persona.profilePhoto}`}
+                              alt={`${persona.name}'s Profile`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
+                              No Image
+                            </div>
+                          )}
 
-                        <div className="w-16 h-16 bg-gray-200 rounded-full mb-2 relative">
-                          {/* Placeholder for avatar */}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => toggleFavorite(persona.persona_id || persona.id, e)}
-                            className="absolute -top-2 -right-2 h-6 w-6 text-amber-400 bg-white rounded-full shadow-sm"
-                          >
-                            <Star className="h-4 w-4 fill-current" />
-                          </Button>
+                          ) : (
+                            <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                              <span className="text-gray-500 text-xs">No Image</span>
+                            </div>
+                          )}
                         </div>
-                        <h3 className="font-semibold text-sm">{persona.name}</h3>
+
+                        {/* ✅ Star Button (Placed **Outside** Image, Above) */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => toggleFavorite(persona.persona_id || persona.id, e)}
+                          className="absolute -top-2 -right-2 h-7 w-7 text-amber-400 bg-white rounded-full shadow-md border flex items-center justify-center"
+                        >
+                          <Star className={`h-5 w-5 ${persona.isFavorite ? "fill-current" : ""}`} />
+                        </Button>
+
+                        {/* ✅ Persona Details */}
+                        <h3 className="font-semibold text-sm mt-2">{persona.name}</h3>
                         <p className="text-xs text-gray-500">{persona.type}</p>
                         <p className="text-xs text-gray-500 truncate max-w-full">{persona.email}</p>
                       </div>
@@ -719,60 +751,103 @@ export default function PersonaDashboard() {
                   </div>
                 )}
 
+
                 {favViewMode === "card" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {favorites.map((persona) => (
                       <div
                         key={persona.persona_id || persona.id}
-                        className="border rounded-lg p-4 flex justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className="border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         onClick={() => navigateToProfile(persona.persona_id || persona.id)}
                       >
-                        <div>
-                          <h3 className="font-semibold text-lg">{persona.name}</h3>
-                          <p className="text-gray-500">{persona.type}</p>
-                          {persona.role && <p>Role: {persona.role}</p>}
-                          {persona.department && <p>Dept: {persona.department}</p>}
-                          {persona.category && <p>Category: {persona.category}</p>}
-                          {persona.investment && <p>Investment: {persona.investment}</p>}
+                        {/* Left Section: Profile Image & Details */}
+                        <div className="flex items-center space-x-4">
+                          {/* ✅ Profile Image */}
+                          <div className="w-24 h-24 bg-gray-200 rounded-full overflow-hidden shadow-md border-2 border-gray-300">
+                            {persona.profilePhoto ? (
+                              <img
+                                src={persona.profilePhoto.startsWith("http") ? persona.profilePhoto : `http://localhost:5000/${persona.profilePhoto}`}
+                                alt={`${persona.name}'s Profile`}
+                                className="w-full h-full object-cover"
+                              />
+
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-500 text-lg">
+                                No Image
+                              </div>
+                            )}
+
+                            ) : (
+                              <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                <span className="text-gray-500 text-sm">No Image</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ✅ Persona Details */}
+                          <div>
+                            <h3 className="font-semibold text-lg">{persona.name}</h3>
+                            <p className="text-gray-500">{persona.type}</p>
+                            {persona.role && <p className="text-sm text-gray-600">Role: {persona.role}</p>}
+                            {persona.department && <p className="text-sm text-gray-600">Dept: {persona.department}</p>}
+                          </div>
                         </div>
+
+                        {/* ✅ Favorite Button */}
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={(e) => toggleFavorite(persona.persona_id || persona.id, e)}
                           className="h-8 w-8 text-amber-400"
                         >
-                          <Star className="h-5 w-5 fill-current" />
+                          <Star className={`h-5 w-5 ${persona.isFavorite ? "fill-current" : ""}`} />
                         </Button>
                       </div>
                     ))}
                   </div>
                 )}
 
+
                 {favViewMode === "list" && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {favorites.map((persona) => (
                       <div
                         key={persona.persona_id || persona.id}
-                        className="flex items-center border-b pb-2 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className="flex items-center border-b pb-2 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors px-3 py-2 rounded-lg"
                         onClick={() => navigateToProfile(persona.persona_id || persona.id)}
                       >
-                        <div className="w-10 h-10 bg-gray-200 rounded-full mr-3"></div>
+                        {/* ✅ Profile Image */}
+                        <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600 mr-4">
+                          {persona.profilePhoto ? (
+                            <img
+                              src={persona.profilePhoto.startsWith("http") ? persona.profilePhoto : `http://localhost:5000/${persona.profilePhoto}`}
+                              alt={`${persona.name}'s Profile`}
+                              className="w-full h-full object-cover"
+                            />
+
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+                              No Image
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ✅ Persona Info */}
                         <div className="flex-1">
                           <div className="flex justify-between items-center">
-                            <h3 className="font-semibold">{persona.name}</h3>
+                            <h3 className="font-semibold text-base">{persona.name}</h3>
+                            {/* ✅ Favorite Button */}
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={(e) => toggleFavorite(persona.persona_id || persona.id, e)}
-                              className="h-6 w-6 text-amber-400"
+                              className="h-8 w-8 text-amber-400"
                             >
-                              <Star className="h-4 w-4 fill-current" />
+                              <Star className={`h-5 w-5 ${persona.isFavorite ? "fill-current" : ""}`} />
                             </Button>
                           </div>
                           <div className="flex items-center text-sm text-gray-500">
-                            <Badge variant="outline" className="mr-2">
-                              {persona.type}
-                            </Badge>
+                            <Badge variant="outline" className="mr-2">{persona.type}</Badge>
                             <span>{persona.email}</span>
                           </div>
                         </div>
@@ -824,6 +899,21 @@ export default function PersonaDashboard() {
                       className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md cursor-pointer transition-colors"
                       onClick={() => navigateToProfile(persona.persona_id || persona.id)}
                     >
+                      {/* ✅ Profile Image */}
+                      <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mr-3">
+                        {persona.profilePhoto ? (
+                          <img
+                            src={persona.profilePhoto.startsWith("http") ? persona.profilePhoto : `http://localhost:5000/${persona.profilePhoto}`}
+                            alt={`${persona.name}'s Profile`}
+                            className="w-full h-full object-cover"
+                          />
+
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+                            No Image
+                          </div>
+                        )}
+                      </div>
                       <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full mr-3"></div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center">
@@ -863,6 +953,21 @@ export default function PersonaDashboard() {
                       className="flex items-start border-b pb-4 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                       onClick={() => navigateToProfile(persona.persona_id || persona.id)}
                     >
+                      {/* ✅ Profile Image */}
+                      <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mr-4">
+                        {persona.profilePhoto ? (
+                          <img
+                            src={persona.profilePhoto.startsWith("http") ? persona.profilePhoto : `http://localhost:5000/${persona.profilePhoto}`}
+                            alt={`${persona.name}'s Profile`}
+                            className="w-full h-full object-cover"
+                          />
+
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+                            No Image
+                          </div>
+                        )}
+                      </div>
                       <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-4"></div>
                       <div className="flex-1">
                         <div className="flex justify-between">

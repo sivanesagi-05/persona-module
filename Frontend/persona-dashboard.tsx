@@ -113,7 +113,7 @@ export default function PersonaDashboard() {
   const employeeCount = personas.filter((p) => p.type === "Employees").length;
   const vendorCount = personas.filter((p) => p.type === "Vendors").length;
   const customerCount = personas.filter((p) => p.type === "Customers").length;
-  const otherCount = personas.filter((p) => p.type === "Other").length;
+  const otherCount = personas.filter((p) => p.type === "Others").length;
   // const favoritedPercentage = personas.length > 0 ? Math.round((favorites.length / personas.length) * 100) : 0
 
 
@@ -914,7 +914,7 @@ export default function PersonaDashboard() {
                           </div>
                         )}
                       </div>
-                      <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full mr-3"></div>
+                      {/* <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full mr-3"></div> */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center">
                           <h3 className="font-semibold truncate">{persona.name}</h3>
@@ -968,7 +968,7 @@ export default function PersonaDashboard() {
                           </div>
                         )}
                       </div>
-                      <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-4"></div>
+                      {/* <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-4"></div> */}
                       <div className="flex-1">
                         <div className="flex justify-between">
                           <h3 className="font-semibold text-lg">{persona.name}</h3>

@@ -50,6 +50,12 @@ const createPersona = async (persona) => {
 
     console.log(`✅ Persona inserted with ID: ${personaResult.id}`);
 
+    // ✅ Skip additional table inserts for "Others"
+    if (persona.type === "Others") {
+      console.log("ℹ️ No additional details to insert for type 'Others'.");
+      return personaResult;
+    }
+
     // ✅ Insert into Respective Table Based on Type
     if (persona.type === "Employees") {
       const employeeQuery = `

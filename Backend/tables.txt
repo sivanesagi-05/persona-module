@@ -13,7 +13,8 @@ CREATE TABLE personas (
     type VARCHAR(50) NOT NULL CHECK (type IN ('Employees', 'Vendors', 'Customers', 'Others')),
     is_favorite BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    profile_photo TEXT
 );
 
 -- ✅ Employees Table (Linked to Personas)
@@ -30,6 +31,7 @@ CREATE TABLE employees (
     previous_employer VARCHAR(255),
     FOREIGN KEY (persona_id) REFERENCES personas(id) ON DELETE CASCADE
 );
+
 
 -- ✅ Vendors Table (Linked to Personas)
 CREATE TABLE vendors (

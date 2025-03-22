@@ -54,19 +54,19 @@ router.get("/analytics", async (req, res) => {
       ORDER BY DATE_TRUNC('month', created_at);
     `);
 
-    // Weekly activity data (if interactions table exists)
+    // Weekly activity data (using personas table)
     let activityData = [];
     try {
       activityData = await db.any(`
         SELECT 
           TO_CHAR(DATE_TRUNC('week', created_at), 'WW') AS week,
-          COUNT(*) AS interactions
-        FROM interactions
+          COUNT(*) AS total_personas
+        FROM personas
         GROUP BY DATE_TRUNC('week', created_at)
         ORDER BY DATE_TRUNC('week', created_at);
       `);
     } catch (error) {
-      console.warn("Interactions table not found. Skipping activity data.");
+      console.warn("Error fetching activity data:", error);
     }
 
     // Engagement rate
@@ -85,7 +85,7 @@ router.get("/analytics", async (req, res) => {
       monthlyData,
       activityData: activityData.map((item) => ({
         name: `Week ${item.week}`,
-        interactions: parseInt(item.interactions, 10),
+        interactions: parseInt(item.total_personas, 10),
       })),
     });
   } catch (error) {

@@ -163,6 +163,7 @@ export default function AnalyticsDialog({ isOpen, onClose }: AnalyticsDialogProp
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{analyticsData.totalPersonas}</div>
+                  <p className="text-sm text-green-500">+12.5% from last month</p>
                 </CardContent>
               </Card>
               <Card>
@@ -171,6 +172,7 @@ export default function AnalyticsDialog({ isOpen, onClose }: AnalyticsDialogProp
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{analyticsData.activeEmployees}</div>
+                  <p className="text-sm text-green-500">+5.2% from last month</p>
                 </CardContent>
               </Card>
               <Card>
@@ -179,32 +181,55 @@ export default function AnalyticsDialog({ isOpen, onClose }: AnalyticsDialogProp
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{analyticsData.engagementRate}</div>
+                  <p className="text-sm text-red-500">-2.1% from last month</p>
                 </CardContent>
               </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Persona Growth Chart */}
               <Card>
                 <CardHeader>
                   <CardTitle>Persona Growth</CardTitle>
                   <CardDescription>Monthly growth of personas by type</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={analyticsData.monthlyData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
+                      <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="employees" fill="#3b82f6" />
-                      <Bar dataKey="vendors" fill="#22c55e" />
-                      <Bar dataKey="customers" fill="#a855f7" />
+                      <Bar dataKey="employees" fill="#3b82f6" name="Employees" />
+                      <Bar dataKey="vendors" fill="#22c55e" name="Vendors" />
+                      <Bar dataKey="customers" fill="#a855f7" name="Customers" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
 
+              {/* Activity Over Time Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Activity Over Time</CardTitle>
+                  <CardDescription>Number of personas created weekly</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ReLineChart data={analyticsData.activityData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="interactions" stroke="#3b82f6" name="Personas Created" />
+                    </ReLineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Type Distribution */}
               <Card>
                 <CardHeader>
                   <CardTitle>Type Distribution</CardTitle>
@@ -250,25 +275,6 @@ export default function AnalyticsDialog({ isOpen, onClose }: AnalyticsDialogProp
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Activity Over Time</CardTitle>
-                  <CardDescription>Interaction frequency trends</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ReLineChart data={analyticsData.activityData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="interactions" stroke="#3b82f6" />
-                    </ReLineChart>
-                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </div>

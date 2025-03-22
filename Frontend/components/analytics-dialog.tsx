@@ -1,25 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react";
 import {
   BarChart3,
-  PieChart,
-  LineChart,
-  Users,
+  RefreshCw,
+  Download,
   Calendar,
   Filter,
-  Download,
-  RefreshCw,
-  Share2,
-  Maximize2,
-} from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog"
-import { Button } from "./ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
-import { Badge } from "./ui/badge"
-import { Progress } from "./ui/progress"
+} from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Progress } from "./ui/progress";
 import {
   BarChart,
   Bar,
@@ -34,74 +28,82 @@ import {
   Cell,
   LineChart as ReLineChart,
   Line,
-} from "recharts"
+} from "recharts";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import axios from "axios";
 
 interface AnalyticsDialogProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-// Sample data for charts
-const monthlyData = [
-  { name: "Jan", employees: 40, vendors: 24, customers: 35 },
-  { name: "Feb", employees: 45, vendors: 25, customers: 38 },
-  { name: "Mar", employees: 50, vendors: 28, customers: 42 },
-  { name: "Apr", employees: 55, vendors: 30, customers: 45 },
-  { name: "May", employees: 60, vendors: 32, customers: 48 },
-  { name: "Jun", employees: 65, vendors: 35, customers: 52 },
-  { name: "Jul", employees: 70, vendors: 38, customers: 55 },
-  { name: "Aug", employees: 75, vendors: 40, customers: 58 },
-  { name: "Sep", employees: 80, vendors: 42, customers: 62 },
-  { name: "Oct", employees: 85, vendors: 45, customers: 65 },
-  { name: "Nov", employees: 90, vendors: 48, customers: 68 },
-  { name: "Dec", employees: 95, vendors: 50, customers: 72 },
-]
-
-const typeDistributionData = [
-  { name: "Employees", value: 524, color: "#3b82f6" },
-  { name: "Customers", value: 349, color: "#22c55e" },
-  { name: "Vendors", value: 225, color: "#a855f7" }
-]
-
-const activityData = [
-  { name: "Week 1", interactions: 120 },
-  { name: "Week 2", interactions: 150 },
-  { name: "Week 3", interactions: 180 },
-  { name: "Week 4", interactions: 170 },
-  { name: "Week 5", interactions: 200 },
-  { name: "Week 6", interactions: 220 },
-  { name: "Week 7", interactions: 240 },
-  { name: "Week 8", interactions: 230 },
-  { name: "Week 9", interactions: 250 },
-  { name: "Week 10", interactions: 270 },
-  { name: "Week 11", interactions: 290 },
-  { name: "Week 12", interactions: 310 },
-]
-
-const locationData = [
-  { name: "New York", value: 350, color: "#3b82f6" },
-  { name: "San Francisco", value: 280, color: "#22c55e" },
-  { name: "Chicago", value: 200, color: "#a855f7" },
-  { name: "Austin", value: 170, color: "#f59e0b" },
-  { name: "Seattle", value: 150, color: "#ec4899" },
-  { name: "Other", value: 98, color: "#64748b" },
-]
-
 export default function AnalyticsDialog({ isOpen, onClose }: AnalyticsDialogProps) {
-  const [timeRange, setTimeRange] = useState("30days")
-  const [isLoading, setIsLoading] = useState(false)
+  const [timeRange, setTimeRange] = useState("30days");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analyticsData, setAnalyticsData] = useState({
+    totalPersonas: 0,
+    activeEmployees: 0,
+    engagementRate: "0%",
+    typeDistribution: [],
+    monthlyData: [],
+    activityData: [],
+  });
 
+  const analyticsRef = useRef<HTMLDivElement>(null);
+
+  // Fetch analytics data from the backend
+  const fetchAnalyticsData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`http://localhost:5000/api/analytics?timeRange=${timeRange}`);
+      setAnalyticsData(response.data);
+    } catch (error) {
+      console.error("Error fetching analytics data:", error);
+      setError("Failed to fetch data. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchAnalyticsData();
+    }
+  }, [isOpen, timeRange]);
+
+  // Export data as JSON
+  const exportJSON = () => {
+    const dataStr = JSON.stringify(analyticsData, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "analytics-data.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export data as PDF
+  const exportPDF = async () => {
+    if (!analyticsRef.current) return;
+
+    const canvas = await html2canvas(analyticsRef.current);
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    pdf.save("analytics-data.pdf");
+  };
+
+  // Refresh data
   const refreshData = () => {
-    setIsLoading(true)
-    // Simulate data loading
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 1500)
-  }
-
-  const exportData = () => {
-    alert("Analytics data would be exported in a real application")
-  }
+    fetchAnalyticsData();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -133,205 +135,151 @@ export default function AnalyticsDialog({ isOpen, onClose }: AnalyticsDialogProp
               <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             </Button>
 
-            <Button variant="outline" size="icon" onClick={exportData}>
+            <Button variant="outline" size="icon" onClick={exportJSON}>
               <Download className="h-4 w-4" />
             </Button>
 
-            <Button variant="ghost" size="icon">
-              <Filter className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={exportPDF}>
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        <Tabs defaultValue="personas" className="mt-4">
-          <TabsList className="grid grid-cols-1 w-[400px]">
-            <TabsTrigger value="personas">
-              <Users className="h-4 w-4 mr-2" />
-              Personas
-            </TabsTrigger>
-          </TabsList>
+        {isLoading ? (
+          <div className="h-[500px] flex flex-col items-center justify-center">
+            <RefreshCw className="h-8 w-8 animate-spin mb-4 text-primary" />
+            <p>Loading analytics data...</p>
+          </div>
+        ) : error ? (
+          <div className="h-[500px] flex flex-col items-center justify-center">
+            <p className="text-red-500">{error}</p>
+          </div>
+        ) : (
+          <div ref={analyticsRef}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total Personas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{analyticsData.totalPersonas}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Active Employees</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{analyticsData.activeEmployees}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Engagement Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{analyticsData.engagementRate}</div>
+                </CardContent>
+              </Card>
+            </div>
 
-          <TabsContent value="personas" className="space-y-4 mt-4">
-            {isLoading ? (
-              <div className="h-[500px] flex flex-col items-center justify-center">
-                <RefreshCw className="h-8 w-8 animate-spin mb-4 text-primary" />
-                <p>Loading analytics data...</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <Card className="bg-card dark:bg-card text-card-foreground dark:text-card-foreground">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Total Personas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">1,248</div>
-                      <p className="text-xs text-muted-foreground">
-                        <span className="text-green-500">+12.5%</span> from last month
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-card dark:bg-card text-card-foreground dark:text-card-foreground">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Active Personas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">842</div>
-                      <p className="text-xs text-muted-foreground">
-                        <span className="text-green-500">+5.2%</span> from last month
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-card dark:bg-card text-card-foreground dark:text-card-foreground">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Engagement Rate</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">67.4%</div>
-                      <p className="text-xs text-muted-foreground">
-                        <span className="text-red-500">-2.1%</span> from last month
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Persona Growth</CardTitle>
+                  <CardDescription>Monthly growth of personas by type</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="employees" fill="#3b82f6" />
+                      <Bar dataKey="vendors" fill="#22c55e" />
+                      <Bar dataKey="customers" fill="#a855f7" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Card className="col-span-1 lg:col-span-2 bg-card dark:bg-card text-card-foreground dark:text-card-foreground">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <div>
-                        <CardTitle>Persona Growth</CardTitle>
-                        <CardDescription>Monthly growth of personas by type</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon">
-                          <Maximize2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon">
-                          <Share2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pb-4">
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            width={600}
-                            height={300}
-                            data={monthlyData}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="employees" fill="#3b82f6" name="Employees" />
-                            <Bar dataKey="vendors" fill="#22c55e" name="Vendors" />
-                            <Bar dataKey="customers" fill="#a855f7" name="Customers" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-card dark:bg-card text-card-foreground dark:text-card-foreground">
-                    <CardHeader className="pb-2">
-                      <CardTitle>Type Distribution</CardTitle>
-                      <CardDescription>Breakdown by persona type</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RePieChart>
-                            <Pie
-                              data={typeDistributionData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                            >
-                              {typeDistributionData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </RePieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="space-y-4 mt-4">
-                        {typeDistributionData.map((item) => (
-                          <div className="space-y-2" key={item.name}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Badge style={{ backgroundColor: item.color }}>{item.name}</Badge>
-                                <span className="text-sm">{Math.round((item.value / 1248) * 100)}%</span>
-                              </div>
-                              <span className="text-sm font-medium">{item.value}</span>
-                            </div>
-                            <Progress
-                              value={Math.round((item.value / 1248) * 100)}
-                              className="h-2"
-                              indicatorClassName="bg-primary"
-                            />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Type Distribution</CardTitle>
+                  <CardDescription>Breakdown by persona type</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[250px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RePieChart>
+                        <Pie
+                          data={analyticsData.typeDistribution}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {analyticsData.typeDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </RePieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-4 mt-4">
+                    {analyticsData.typeDistribution.map((item) => (
+                      <div className="space-y-2" key={item.name}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge style={{ backgroundColor: item.color }}>{item.name}</Badge>
+                            <span className="text-sm">{Math.round((item.value / analyticsData.totalPersonas) * 100)}%</span>
                           </div>
-                        ))}
+                          <span className="text-sm font-medium">{item.value}</span>
+                        </div>
+                        <Progress
+                          value={Math.round((item.value / analyticsData.totalPersonas) * 100)}
+                          className="h-2"
+                          indicatorClassName="bg-primary"
+                        />
                       </div>
-                    </CardContent>
-                  </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-                  <Card className="bg-card dark:bg-card text-card-foreground dark:text-card-foreground">
-                    <CardHeader className="pb-2">
-                      <CardTitle>Activity Over Time</CardTitle>
-                      <CardDescription>Interaction frequency trends</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ReLineChart
-                            data={activityData}
-                            margin={{
-                              top: 5,
-                              right: 30,
-                              left: 20,
-                              bottom: 5,
-                            }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="interactions"
-                              stroke="#3b82f6"
-                              activeDot={{ r: 8 }}
-                              name="Interactions"
-                            />
-                          </ReLineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </>
-            )}
-          </TabsContent>
-        </Tabs>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Activity Over Time</CardTitle>
+                  <CardDescription>Interaction frequency trends</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ReLineChart data={analyticsData.activityData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="interactions" stroke="#3b82f6" />
+                    </ReLineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
 
-        <DialogFooter className="mt-6">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Close
-          </Button>
-          <Button type="button" onClick={exportData}>
-            Export Data
-          </Button>
+        <DialogFooter>
+          <Button onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 

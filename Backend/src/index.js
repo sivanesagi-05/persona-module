@@ -18,6 +18,9 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 const personaRoutes = require('./routes/personaRoutes'); // Import routes
 app.use('/api', personaRoutes);
 
+const analyticsRoutes = require("./routes/analytics");
+app.use("/api", analyticsRoutes);
+
 // Start server
 app.listen(port, () => {
   console.log(`✅ Server is running on http://localhost:${port}`);

@@ -195,7 +195,10 @@ const AddPersonaModal = ({ isOpen, onClose, onAdd }: AddPersonaModalProps) => {
       console.log("✅ Persona added successfully:", response.data);
 
       // ✅ Call onAdd to update UI instantly
-      onAdd(response.data.data);
+      await onAdd(response.data.data);
+
+      // Reset the form after submission
+      form.reset();
 
       // ✅ Close Modal After Submission
       onClose();
@@ -203,6 +206,13 @@ const AddPersonaModal = ({ isOpen, onClose, onAdd }: AddPersonaModalProps) => {
       console.error("❌ Error adding persona:", error);
     }
   };
+
+  // Reset the form when the modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      form.reset();
+    }
+  }, [isOpen]);
 
 
 

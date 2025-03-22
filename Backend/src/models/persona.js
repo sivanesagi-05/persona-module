@@ -177,4 +177,4 @@ const toggleFavorite = async (id, isFavorite) => {
 };
 
 // ✅ Export All Functions
-module.exports = { createPersona, getPersonasByType, toggleFavorite };
+module.exports = { db, createPersona, getPersonasByType, toggleFavorite };

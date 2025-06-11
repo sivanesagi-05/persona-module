@@ -86,4 +86,33 @@ router.patch("/personas/:id/favorite", async (req, res) => {
   }
 });
 
+// ✅ Get a single persona by ID
+router.get("/personas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🔍 Fetching persona with ID: ${id}`);
+
+    const persona = await db.oneOrNone("SELECT * FROM personas WHERE id = $1", [id]);
+
+    if (!persona) {
+      console.log(`❌ Persona not found with ID: ${id}`);
+      return res.status(404).json({ message: "Persona not found" });
+    }
+
+    // Format response to return full image URL
+    const formattedPersona = {
+      ...persona,
+      profile_photo: persona.profile_photo
+        ? `${process.env.BACKEND_URL || "http://localhost:5000"}/uploads/${persona.profile_photo}`
+        : null,
+    };
+
+    console.log(`✅ Persona found: ${formattedPersona.name}`);
+    res.status(200).json(formattedPersona);
+  } catch (error) {
+    console.error("❌ Error fetching persona:", error);
+    res.status(500).json({ message: "Error fetching persona", error: error.message });
+  }
+});
+
 module.exports = router;

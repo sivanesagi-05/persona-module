@@ -64,6 +64,7 @@ import AnalyticsDialog from "./components/analytics-dialog"
 import BackupDataDialog from "./components/backup-data-dialog"
 import RestoreDataDialog from "./components/restore-data-dialog"
 import ImportDataModal from "./components/import-data-dialog"
+
 type ViewMode = "card" | "list" | "grid" | "compact"
 type SortOption = "name" | "type" | "added" | "recent"
 type FilterCriteria = {
@@ -263,35 +264,11 @@ export default function PersonaDashboard() {
     window.print()
   }
 
-  // Navigate to profile page
-  const navigateToProfile = (id: string) => {
-    const persona = personas.find(p => p.id === id || p.persona_id === id); // ✅ Find persona by both id & persona_id
-
-    if (!persona) {
-      console.warn(`❌ Persona with ID ${id} not found.`);
-      return;
-    }
-
-    const personaId = persona.persona_id || persona.id; // ✅ Ensure correct ID
-
-    switch (persona.type) {
-      case "Employees":
-        router.push(`/profile/employee/${personaId}`);
-        break;
-      case "Vendors":
-        router.push(`/profile/vendor/${personaId}`);
-        break;
-      case "Customers":
-        router.push(`/profile/customer/${personaId}`);
-        break;
-      case "Others": // ✅ Handle "Others" persona type
-        router.push(`/profile/others/${personaId}`);
-        break;
-      default:
-        router.push(`/profile/${personaId}`);
-    }
-  };
-
+  // Remove the navigateToProfile function
+  const navigateToProfile = (personaId: string) => {
+    // For now, we'll just show a message that profiles are not available
+    alert("Profile pages are currently unavailable. This feature will be implemented in a future update.");
+  }
 
   // Filter personas based on search query and advanced filters
   const filteredPersonas = personas.filter((persona) => {
@@ -374,6 +351,10 @@ export default function PersonaDashboard() {
     filterCriteria.status.length +
     filterCriteria.location.length +
     (filterCriteria.dateAdded !== "all" ? 1 : 0)
+
+  const handleAddGroups = () => {
+    router.push("/groups")
+  }
 
   return (
     <div className="container mx-auto p-4 max-w-7xl">
@@ -724,12 +705,6 @@ export default function PersonaDashboard() {
                               No Image
                             </div>
                           )}
-
-                          ) : (
-                            <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                              <span className="text-gray-500 text-xs">No Image</span>
-                            </div>
-                          )}
                         </div>
 
                         {/* ✅ Star Button (Placed **Outside** Image, Above) */}
@@ -757,8 +732,8 @@ export default function PersonaDashboard() {
                     {favorites.map((persona) => (
                       <div
                         key={persona.persona_id || persona.id}
-                        className="border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => navigateToProfile(persona.persona_id || persona.id)}
+                        className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => navigateToProfile(persona.id)}
                       >
                         {/* Left Section: Profile Image & Details */}
                         <div className="flex items-center space-x-4">
@@ -774,12 +749,6 @@ export default function PersonaDashboard() {
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-500 text-lg">
                                 No Image
-                              </div>
-                            )}
-
-                            ) : (
-                              <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                                <span className="text-gray-500 text-sm">No Image</span>
                               </div>
                             )}
                           </div>
@@ -1024,6 +993,7 @@ export default function PersonaDashboard() {
             onViewAnalytics={() => setIsAnalyticsOpen(true)}
             onBackupData={() => setIsBackupDataOpen(true)}
             onRestoreData={() => setIsRestoreDataOpen(true)}
+            onAddGroups={handleAddGroups}
           />
 
           {/* Persona Stats */}

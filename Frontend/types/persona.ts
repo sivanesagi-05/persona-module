@@ -12,6 +12,11 @@ export type Persona = {
   lastInteraction?: string
   isFavorite: boolean
   status?: string
+  about?: string
+  services?: string[]
+  goals?: string
+  googleAccount?: string
+  manager?: string
 
   // Employee specific fields
   role?: string
@@ -33,6 +38,8 @@ export type Persona = {
   bankName?: string
   accountNumber?: string
   ifscCode?: string
+  company?: string
+  serviceType?: string
 
   // Customer specific fields
   revenue?: string
@@ -53,6 +60,8 @@ export type Persona = {
   solutionsNeeded?: string
   customerSegment?: string
   expectedGain?: string
+  accountType?: string
+  industry?: string
 
   // Investor specific fields
   investment?: string

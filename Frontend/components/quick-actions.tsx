@@ -12,6 +12,7 @@ import {
   Download,
   Share2,
   Network,
+  Users,
 } from "lucide-react"
 import { Card, CardContent } from "./ui/card"
 import { Button } from "./ui/button"
@@ -30,6 +31,7 @@ interface QuickActionsProps {
   onViewAnalytics: () => void
   onBackupData: () => void
   onRestoreData: () => void
+  onAddGroups: () => void
 }
 
 // In the QuickActions function declaration, add default values for the new props
@@ -44,6 +46,7 @@ export default function QuickActions({
   onViewAnalytics = () => {},
   onBackupData = () => {},
   onRestoreData = () => {},
+  onAddGroups = () => {},
 }: QuickActionsProps) {
   const [activeTab, setActiveTab] = useState<string>("general")
   const router = useRouter()
@@ -91,6 +94,13 @@ export default function QuickActions({
               onClick={handleRelationshipManagement}
             >
               <Network className="h-4 w-4 mr-2" /> Relationship Management
+            </Button>
+            <Button
+              variant="default"
+              className="w-full justify-start bg-green-600 hover:bg-green-700"
+              onClick={onAddGroups}
+            >
+              <Users className="h-4 w-4 mr-2" /> Add Groups
             </Button>
           </div>
         )}
